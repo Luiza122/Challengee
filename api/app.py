@@ -46,6 +46,56 @@ REQUIRED_FIELDS = {
 }
 
 
+def _error_response(
+    error: str, invalid_fields: List[str], hint: str
+) -> tuple[object, int]:
+    return (
+        jsonify(
+            {
+                "error": error,
+                "invalid_fields": sorted(invalid_fields),
+                "hint": hint,
+            }
+        ),
+        400,
+    )
+
+
+def _validate_predict_payload(payload: Dict[str, object]) -> tuple[bool, object]:
+    invalid_fields: List[str] = []
+
+    for field in sorted(REQUIRED_FIELDS):
+        value = payload.get(field)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            invalid_fields.append(field)
+
+    if invalid_fields:
+        return False, _error_response(
+            "payload invalido: campos obrigatorios ausentes ou vazios",
+            invalid_fields,
+            "Preencha todos os campos obrigatorios e envie valores nao vazios.",
+        )
+
+    try:
+        idade = int(payload.get("idade"))
+    except (TypeError, ValueError):
+        return False, _error_response(
+            "payload invalido: idade deve ser um inteiro",
+            ["idade"],
+            "Use um numero inteiro para idade, por exemplo: 35.",
+        )
+
+    if idade < 18 or idade > 100:
+        return False, _error_response(
+            "payload invalido: idade fora da faixa plausivel",
+            ["idade"],
+            "A idade deve estar entre 18 e 100 anos.",
+        )
+
+    payload["idade"] = idade
+    return True, None
+
+
 def _dummy_profile_probabilities(payload: Dict[str, object]) -> Dict[str, float]:
     base = {"Fiel": 0.25, "Abandono": 0.25, "Esquecido": 0.25, "Economico": 0.25}
 
@@ -99,9 +149,9 @@ def health() -> object:
 def predict() -> object:
     payload = request.get_json(silent=True) or {}
 
-    missing = sorted(REQUIRED_FIELDS - set(payload.keys()))
-    if missing:
-        return jsonify({"error": "campos obrigatorios ausentes", "missing_fields": missing}), 400
+    is_valid, error_response = _validate_predict_payload(payload)
+    if not is_valid:
+        return error_response
 
     probs = _dummy_profile_probabilities(payload)
     profile = max(probs, key=probs.get)
