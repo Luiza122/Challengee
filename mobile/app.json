@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "FordRetain",
+    "slug": "fordretain",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0B2A8A"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ]
+  }
+}
