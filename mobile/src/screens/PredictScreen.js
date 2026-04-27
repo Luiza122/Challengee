@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 
 import { predictClient } from '../services/api';
@@ -13,17 +13,64 @@ const initialForm = {
   canal_compra: '',
 };
 
+const fieldLabels = {
+  cliente_id: 'Cliente',
+  idade: 'Idade',
+  regiao: 'Região',
+  forma_pagamento: 'Forma de pagamento',
+  modelo_carro: 'Modelo do carro',
+  historico_marca: 'Histórico de marca',
+  canal_compra: 'Canal de compra',
+};
+
+function validateForm(form) {
+  const requiredFields = [
+    'cliente_id',
+    'regiao',
+    'forma_pagamento',
+    'modelo_carro',
+    'historico_marca',
+    'canal_compra',
+  ];
+
+  const invalidFields = [];
+
+  requiredFields.forEach((field) => {
+    if (!String(form[field] ?? '').trim()) {
+      invalidFields.push(field);
+    }
+  });
+
+  const idade = Number(form.idade);
+  if (!Number.isFinite(idade) || idade <= 0) {
+    invalidFields.push('idade');
+  }
+
+  return {
+    isValid: invalidFields.length === 0,
+    invalidFields,
+  };
+}
+
 export default function PredictScreen() {
   const [form, setForm] = useState(initialForm);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const validation = useMemo(() => validateForm(form), [form]);
+
   function setField(name, value) {
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
   async function onSubmit() {
+    if (!validation.isValid) {
+      const invalidLabels = validation.invalidFields.map((field) => fieldLabels[field]);
+      setError(`Revise os campos: ${invalidLabels.join(', ')}.`);
+      return;
+    }
+
     try {
       setLoading(true);
       setError('');
@@ -44,21 +91,29 @@ export default function PredictScreen() {
 
   return (
     <ScrollView>
-      {Object.keys(initialForm).map((field) => (
-        <View style={styles.field} key={field}>
-          <Text style={styles.label}>{field}</Text>
-          <TextInput
-            style={styles.input}
-            value={form[field]}
-            onChangeText={(value) => setField(field, value)}
-            keyboardType={field === 'idade' ? 'numeric' : 'default'}
-            placeholder={`Digite ${field}`}
-            placeholderTextColor="#94A3B8"
-          />
-        </View>
-      ))}
+      {Object.keys(initialForm).map((field) => {
+        const isInvalid = validation.invalidFields.includes(field);
 
-      <TouchableOpacity style={styles.button} onPress={onSubmit} disabled={loading}>
+        return (
+          <View style={styles.field} key={field}>
+            <Text style={styles.label}>{fieldLabels[field]}</Text>
+            <TextInput
+              style={[styles.input, isInvalid && styles.inputInvalid]}
+              value={form[field]}
+              onChangeText={(value) => setField(field, value)}
+              keyboardType={field === 'idade' ? 'numeric' : 'default'}
+              placeholder={`Digite ${fieldLabels[field].toLowerCase()}`}
+              placeholderTextColor="#94A3B8"
+            />
+          </View>
+        );
+      })}
+
+      <TouchableOpacity
+        style={[styles.button, (loading || !validation.isValid) && styles.buttonDisabled]}
+        onPress={onSubmit}
+        disabled={loading || !validation.isValid}
+      >
         <Text style={styles.buttonLabel}>{loading ? 'Processando...' : 'Prever perfil'}</Text>
       </TouchableOpacity>
 
@@ -85,6 +140,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
     color: '#0F172A',
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  inputInvalid: {
+    borderColor: '#EF4444',
   },
   button: {
     marginTop: 8,
@@ -92,6 +152,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonLabel: { color: '#111827', fontWeight: '700' },
   error: { color: '#FCA5A5', marginTop: 10 },
